@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <link rel="shortcut icon" type="image/x-icon" href="./assets/icon.ico">
+    <link rel="stylesheet" href="./assets/bootstrap.min.css" />
+    <link rel="stylesheet" href="./index.css" />
+    <title>My Packaging Desktop App</title>
+    <style>
+      #status {
+        color: red;
+      }
+      .form-control {
+        height: 50px;
+      }
+      #title {
+        cursor: pointer;
+      }
+      #menu {
+        display: none;
+      }
+      #menu.active {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container-fluid mt-3">
+      <h4 id="title" onclick="">My Packaging Tool</h4>
+      <ul id="menu">
+        <li>Git installed</li>
+        <li>Git added to variable path</li>
+        <li>Destination Folder - grab files and stored in this folder</li>
+        <li>Source Folder - folder with .git</li>
+      </ul>
+
+      <div class="input-group mb-3">
+        <div class="input-group-prepend">
+          <label class="input-group-text" for="destFolder">Destination Folder:</label>
+        </div>
+        <input type="file" class="form-control" id="destFolder" />
+        <input type="text" class="form-control" id="destFolderSelected" disabled />
+      </div>
+
+      <div class="input-group mb-3">
+        <div class="input-group-prepend">
+          <label class="input-group-text" for="destFolder">Repository Folder:</label>
+        </div>
+        <input type="file" class="form-control" id="repoFolder" />
+        <input type="text" class="form-control" id="repoFolderSelected" disabled />
+      </div>
+
+      <div class="input-group" id="repoSelectedBranch" style="display: none">
+        <select class="custom-select" aria-label="Repo Branch History"></select>
+        <div class="input-group-append">
+          <button class="btn btn-outline-secondary" type="button">Checkout</button>
+        </div>
+        <br/>
+      </div>
+      <p id="repoCurrentCommit"></p>
+      
+
+      <div class="input-group mb-3" id="repoCommit" style="display: none">
+        <select class="custom-select" aria-label="Repo Commit History"></select>
+        <div class="input-group-append">
+          <button class="btn btn-outline-secondary" type="button">Generate</button>
+        </div>
+      </div>
+
+      Current Status: <span id="status"></span>
+    </div>
+    <script src="./assets/jquery.min.js"></script>
+    <script src="./assets/popper.min.js"></script>
+    <script src="./assets/bootstrap.min.js"></script>
+    <script>
+      // status
+      updateStatus = (msg) => {
+        $('#status').text(msg);
+      };
+
+      // X1) select dest folder -> loading
+      $('#destFolder').on('click', (e) => {
+        e.preventDefault();
+        let selectedFolder = selectFolder('dest');
+        if (selectedFolder) {
+          $('#destFolderSelected').val(selectedFolder);
+        }
+      });
+
+      // A1) select folder -> loading
+      $('#repoFolder').on('click', (e) => {
+        e.preventDefault();
+        let selectedFolder = selectFolder('repo');
+        $('#repoSelectedBranch select').empty();
+        $('#repoCommit select').empty();
+        if (selectedFolder) {
+          $('#repoFolderSelected').val(selectedFolder);
+          showSelectedFolderBranches(selectedFolder);
+          updateStatus('Loading...');
+          $('#repoCurrentCommit').html('');
+          $('#repoCommit').css('display', 'none');
+        }
+      });
+
+      // A2) select folder callback -> reload commit -> ready
+      showSelectedFolderBranchesCallback = (error, path, stdout) => {
+        if (error) return alert(error);
+        $('#repoSelectedBranch').css('display', '');
+        let line = stdout.split(/\r?\n/);
+        line.forEach((val) => {
+          val = val.trim();
+          if (val) {
+            let current = false;
+            let option = $('<option></option>');
+            if (val.includes('*')) {
+              option.attr('selected', 'selected');
+              val = val.replace('*', '').trim();
+            }
+            option.attr('value', val).text(val);
+            $('#repoSelectedBranch select').append(option);
+          }
+        });
+        updateStatus('Ready!');
+      };
+
+      // B1) checkout branch -> loading
+      $('#repoSelectedBranch button').on('click', (e) => {
+        checkoutBranch($('#repoFolderSelected').val(), $('#repoSelectedBranch select option:selected').val());
+        updateStatus('Loading...');
+      });
+
+      // B2) checkout branch callback -> reload commit -> ready
+      checkoutBranchCallback = (error, path, branch) => {
+        if (error) return alert(error);
+        $('#repoSelectedBranch select').val(branch).change();
+        reloadCommit(path, branch);
+      };
+
+      // load commits
+      reloadCommit = (path, branch) => {
+        $('#repoCurrentCommit').html('');
+        $('#repoCommit select').empty();
+        loadCommit(path, branch);
+      };
+
+      // loaded commits
+      reloadedCommit = (error, commit) => {
+        if (error) return alert(error);
+        $('#repoCommit').css('display', '');
+        let line = commit.split(/\r?\n/);
+        line.forEach((val, i) => {
+          val = val.trim();
+          if (val) {
+            var commitId = val.split(' ')[0].trim();
+            var comment = val.substring(val.indexOf(' ')).trim();
+            if (i === 0) {
+              $('#repoCurrentCommit')
+                .attr('value', commitId)
+                .html(`<b>${commitId}</b> ${comment}`);
+            } else {
+              let option = $('<option></option>').attr('value', commitId).text(comment);
+              $('#repoCommit select').append(option);
+            }
+          }
+        });
+        updateStatus('Ready!');
+      };
+
+      // C1) get file change ->
+      $('#repoCommit button').on('click', (e) => {
+        var begin = $('#repoCommit select option:selected').val();
+        var recent = $('#repoCurrentCommit').attr('value');
+        loadFileChange($('#repoFolderSelected').val(), begin, recent);
+        updateStatus('Loading...');
+      });
+
+      // C2) get file change callback -> reload list -> ready
+      showFileChange = (error, path, list) => {
+        if (error) return alert(error);
+        let line = list
+          .split(/\r?\n/)
+          .map((v) => v.trim())
+          .filter((v) => v);
+        packageFile($('#destFolderSelected').val(), path, line);
+      };
+
+      packageFileCallBack = (destPath, error) => {
+        if (error) return alert(error);
+        openFolder(destPath);
+        updateStatus('Ready!');
+      };
+
+      $(document).ready(() => {
+        var settings = reloadSetting();
+        if (settings.dest) {
+          $('#destFolderSelected').val(settings.dest);
+        }
+        if (settings.repo) {
+          $('#repoFolderSelected').val(settings.repo);
+        }
+        if (settings.repo && settings.branch) {
+          showSelectedFolderBranches(settings.repo);
+          reloadCommit(settings.repo, settings.branch);
+        }
+
+        $('#title').click(() => {
+          if ($('#menu').hasClass('active')) {
+            $('#menu').removeClass('active');
+          } else {
+            $('#menu').addClass('active');
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,45 @@
+{
+  "name": "packageapp",
+  "productName": "My Code Packaging App",
+  "version": "1.0.0",
+  "description": "My Code Packaging App using Git Diff",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "electron-forge start",
+    "build-installer": "electron-builder"
+  },
+  "build": {
+    "appId": "package-app",
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "src/icon.png",
+      "requestedExecutionLevel": "requireAdministrator"
+    },
+    "nsis": {
+      "uninstallDisplayName": "My Code Packaging App",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "keywords": [],
+  "author": {
+    "name": "hawjeh",
+    "email": "hawjeh@gmail.com"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "electron-squirrel-startup": "^1.0.0",
+    "electron-store": "^7.0.2"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^6.0.0-beta.54",
+    "@electron-forge/maker-deb": "^6.0.0-beta.54",
+    "@electron-forge/maker-rpm": "^6.0.0-beta.54",
+    "@electron-forge/maker-squirrel": "^6.0.0-beta.54",
+    "@electron-forge/maker-zip": "^6.0.0-beta.54",
+    "electron": "11.2.3",
+    "electron-builder": "^22.10.5"
+  }
+}
